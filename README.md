@@ -122,7 +122,7 @@ find git in --> /Users/cat/Desktop/testGit/a6/packages/apps/Email
 find git in --> /Users/cat/Desktop/testGit/a6/packages/apps/Music
 find git in --> /Users/cat/Desktop/testGit/a6/packages/apps/Settings
 find git in --> /Users/cat/Desktop/testGit/a6/vender/customer
-
+    
 ```
 
 通过输出可以看到，所有的`.repo`以及`.git`目录所在目录是已经找出来了。然后执行`bash_commad(command)`即可完成对文件`mode`的忽略。
