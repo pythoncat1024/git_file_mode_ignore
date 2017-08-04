@@ -5,21 +5,22 @@
 
 * 正文：
 
-最近公司将源码从`svn`切换到`git`上去管理了。但是不幸的是，貌似`git`没有配置好，没有忽略文件的`mode`。
+** git镇楼：`git config --global core.filemode false`**
 
-这样一来就麻烦了，一旦你修改了文件权限，`git`就会认为你修改了该文件。这样，你就得回退，或者提交很多无关文件。
+* **如何利用`python`执行`bash`脚本？**
+* **如何像`cd xxx/`一样任性跳转目录执行`bash`命令？**
 
-**正确的姿势是：`git config --global core.filemode false`**
+**这两个问题解决了，才算是解决了使用`python`脚本执行`bash`命令的全部痛点。**
 
-但是源码下面的`.git`仓库很多，如果要一个个找到，然后一个个修改是很麻烦的事情。于是，想到使用脚本去执行这个事情。
+一一解答：
+> 1. 如何利用`python`执行`bash`脚本？
+* `os.popen(bash_comand)`即可
+> 2. 如何像`cd xxx/`一样任性跳转目录执行`bash`命令？
+* `os.chdir(path)`就如同`cd xxx/`一般，可以任性地切换到任意目录
 
-> *原本是想使用shell去做这件事情的，但是对shell的语法完全不熟悉，看了一会感觉很像windows下的.bat脚本的语法。于是放弃了，因为表达力不足。*
-
-思来想去，虽然`java`最熟悉，但是，怎么把`java`当成脚本使用倒是不会。还是使用`python`吧，反正这种`python`脚本应该很容易实现。
-
-于是，就有了如下代码：
-
-```python
+于是，就有了如下代码   ：
+   
+```
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # @name   : find_target.py
@@ -27,6 +28,8 @@
 # @date   : 2017/8/2.
 
 import os
+import multiprocessing
+import time
 
 
 def bash_shell(bash_command):
@@ -36,8 +39,9 @@ def bash_shell(bash_command):
     :return: bash 命令执行后的控制台输出
     """
     try:
+        print("bash_command = {}".format(bash_command))
         return os.popen(bash_command).read().strip()
-    except:
+    except Exception:
         return None
 
 
@@ -52,77 +56,74 @@ def find_target(target_path="./../", key='.git'):
     for super_dir, dir_names, file_names in walk:
         for dir_name in dir_names:
             if dir_name == key:
-                dir_full_path = os.path.join(super_dir, dir_name)
-                # print(dir_full_path, super_dir, dir_name, sep=" ## ")
                 yield super_dir
 
 
-if __name__ == '__main__':
-    for repo_path in find_target('/Users/cat/Desktop/testGit/a6', key='.repo'):
-        print('find repo in -->', repo_path)
+def execute(semaphore, msg, command='ls -a', path="./"):
+    try:
+        semaphore.acquire()
+        # print(msg)
+        # time.sleep(1)
+        print(bash_shell(command))
+    finally:
+        semaphore.release()
 
-    for git_path in find_target('/Users/cat/Desktop/testGit/a6', key='.git'):
-        print('find git in -->', git_path)
-        print(bash_shell('git config --global core.filemode false'))
-    # test for bash_command
-    # print(bash_shell('git init'))
+
+if __name__ == '__main__':
+    s_time = time.time()
+
+    s = multiprocessing.Semaphore(10)
+
+    command_path = '/Users/cat/Desktop/testGit/a6'
+    # target_path = '/'
+    for repo_path in find_target(command_path, key='.repo'):
+        os.chdir(repo_path)  # todo: the key code !!!
+        msg = 'find repo in -->{}'.format(repo_path)
+        p = multiprocessing.Process(target=execute,
+                                    args=(s, msg,),
+                                    kwargs={'command': 'pwd', 'path': repo_path})
+        p.daemon = True
+        p.start()
+        p.join()
+    for git_path in find_target(command_path, key='.git'):
+        os.chdir(git_path)
+        msg = 'find git in -->{}'.format(git_path)
+        p = multiprocessing.Process(target=execute,
+                                    args=(s, msg,),
+                                    kwargs={'command': 'pwd', 'path': git_path})
+        p.daemon = True
+        p.start()
+        p.join()
+    e_time = time.time()
+
+    print("spend time : {:.3f} seconds".format(e_time - s_time))
+    print('end ', "#" * 20, " end")
     # print(bash_shell('ls -al'))
     pass
 
 ```
 
-> 为了验证代码的正确性，我在本地大致模拟了一些源码的目录结构：
-```tree
-catde:a6 cat$ tree -a
-.
-├── .repo
-├── frameworks
-│   └── base
-│       ├── .git
-│       ├── core
-│       └── libs
-├── out
-├── packages
-│   ├── .gitignore
-│   ├── android.mk
-│   └── apps
-│       ├── Email
-│       │   ├── .git
-│       │   ├── bin
-│       │   ├── res
-│       │   └── src
-│       │       └── HelloWorld.java
-│       ├── Music
-│       │   ├── .git
-│       │   ├── bin
-│       │   ├── res
-│       │   └── src
-│       │       └── HelloWorld.java
-│       └── Settings
-│           ├── .git
-│           ├── aaa.xds
-│           ├── byd
-│           └── readme.txt
-└── vender
-    └── customer
-        └── .git
-
-25 directories, 6 files
-
-catde:a6 cat$ pwd
-/Users/cat/Desktop/testGit/a6
-```
-
 于是，执行之后的输出如下：
 
 ```python
-find repo in --> /Users/cat/Desktop/testGit/a6
-find git in --> /Users/cat/Desktop/testGit/a6/frameworks/base
-find git in --> /Users/cat/Desktop/testGit/a6/packages/apps/Email
-find git in --> /Users/cat/Desktop/testGit/a6/packages/apps/Music
-find git in --> /Users/cat/Desktop/testGit/a6/packages/apps/Settings
-find git in --> /Users/cat/Desktop/testGit/a6/vender/customer
-    
+
+bash_command = pwd
+/Users/cat/Desktop/testGit/a6
+bash_command = pwd
+/Users/cat/Desktop/testGit/a6/frameworks/base
+bash_command = pwd
+/Users/cat/Desktop/testGit/a6/packages/apps/Email
+bash_command = pwd
+/Users/cat/Desktop/testGit/a6/packages/apps/Music
+bash_command = pwd
+/Users/cat/Desktop/testGit/a6/packages/apps/Settings
+bash_command = pwd
+/Users/cat/Desktop/testGit/a6/vender/customer
+spend time : 0.096 seconds
+end  ####################  end
+
+Process finished with exit code 0
+
 ```
 
-通过输出可以看到，所有的`.repo`以及`.git`目录所在目录是已经找出来了。然后执行`bash_commad(command)`即可完成对文件`mode`的忽略。
+通过输出可以看到，所有的`.repo`以及`.git`目录所在目录是已经找出来了。然后执行`bash_commad(command)`即可在仓库目录执行`git / repo`命令了。
