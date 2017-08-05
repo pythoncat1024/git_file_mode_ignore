@@ -21,16 +21,14 @@
 于是，就有了如下代码   ：
    
 ```
-#!/usr/bin/env python3
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# @name   : find_target.py
+# @name   : find_t.py
 # @author : cat
 # @date   : 2017/8/2.
 
 import os
-import multiprocessing
 import time
-
 
 def bash_shell(bash_command):
     """
@@ -39,9 +37,8 @@ def bash_shell(bash_command):
     :return: bash 命令执行后的控制台输出
     """
     try:
-        print("bash_command = {}".format(bash_command))
         return os.popen(bash_command).read().strip()
-    except Exception:
+    except:
         return None
 
 
@@ -56,50 +53,50 @@ def find_target(target_path="./../", key='.git'):
     for super_dir, dir_names, file_names in walk:
         for dir_name in dir_names:
             if dir_name == key:
+                dir_full_path = os.path.join(super_dir, dir_name)
+                # print(dir_full_path, super_dir, dir_name, sep=" ## ")
                 yield super_dir
 
 
-def execute(semaphore, msg, command='ls -a', path="./"):
-    try:
-        semaphore.acquire()
-        # print(msg)
-        # time.sleep(1)
-        print(bash_shell(command))
-    finally:
-        semaphore.release()
-
-
 if __name__ == '__main__':
-    s_time = time.time()
+    print("start execute bash ...........")
+    st = time.time()
+    cwd = os.getcwd()
+    # this for repo
+    for repo_path in find_target(os.getcwd(), key='.repo'):
+        os.chdir(repo_path)
+        if repo_path == os.getcwd():
+            print('find repo in -->', repo_path)
+            print(bash_shell('pwd'))
+            print(bash_shell('repo forall -c git config core.fileMode false	--replace-all'))
 
-    s = multiprocessing.Semaphore(10)
+        else:
+            print('error in chdir 2 {}'.format(repo_path))
+        if os.getcwd() != cwd:
+            os.chdir(cwd)
+        if os.getcwd() != cwd:
+            print('change 2 cwd FAIL !!!  {}'.format(cwd))
 
-    command_path = '/Users/cat/Desktop/testGit/a6'
-    # target_path = '/'
-    for repo_path in find_target(command_path, key='.repo'):
-        os.chdir(repo_path)  # todo: the key code !!!
-        msg = 'find repo in -->{}'.format(repo_path)
-        p = multiprocessing.Process(target=execute,
-                                    args=(s, msg,),
-                                    kwargs={'command': 'pwd', 'path': repo_path})
-        p.daemon = True
-        p.start()
-        p.join()
-    for git_path in find_target(command_path, key='.git'):
+    # this for git
+    for git_path in find_target(os.getcwd(), key='.git'):
         os.chdir(git_path)
-        msg = 'find git in -->{}'.format(git_path)
-        p = multiprocessing.Process(target=execute,
-                                    args=(s, msg,),
-                                    kwargs={'command': 'pwd', 'path': git_path})
-        p.daemon = True
-        p.start()
-        p.join()
-    e_time = time.time()
+        if git_path == os.getcwd():
+            print('find git in -->', git_path)
+            print(bash_shell('pwd'))
+            print(bash_shell('git config --global core.filemode false'))
+        else:
+            print('error in chdir 2 {}'.format(git_path))
+        if os.getcwd() != cwd:
+            os.chdir(cwd)
+        if os.getcwd() != cwd:
+            print('change 2 cwd FAIL !!!  {}'.format(cwd))
 
-    print("spend time : {:.3f} seconds".format(e_time - s_time))
-    print('end ', "#" * 20, " end")
+    et = time.time()
+    print('\n\n    #### execute finished in {:.3f} seconds ####'.format(et - st))
+    print('\n')
+    # test for bash_command
+    # print(bash_shell('git init'))
     # print(bash_shell('ls -al'))
-    pass
 
 ```
 
